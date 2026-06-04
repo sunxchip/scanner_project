@@ -1,0 +1,29 @@
+# 의존성
+node_modules/
+
+# 환경변수 (API 키 포함됨, 절대 올리면 안 됨)
+.env.local
+.env*.local
+
+# 빌드 결과물
+dist/
+
+# Vercel 배포 설정
+.vercel/
+
+# 에디터 설정
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# macOS 시스템 파일
+.DS_Store
+Thumbs.db
+
+# 로그
+*.log
+npm-debug.log*
