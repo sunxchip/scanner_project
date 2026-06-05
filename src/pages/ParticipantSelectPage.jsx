@@ -48,7 +48,7 @@ export default function ParticipantSelectPage() {
 
     const encoded = encodeData(selectionData);
     // 코드 대신 결제자가 클릭할 수 있는 정산 취합 페이지 링크로 변환
-    const link = `${window.location.origin}/settlement?addResponse=${encoded}`;
+    const link = `${window.location.origin}/settle?addResponse=${encoded}`;
     setResultCode(link);
   };
 

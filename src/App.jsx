@@ -17,6 +17,7 @@ export default function App() {
             <Route path="/create" element={<ReceiptInputPage />} />
             <Route path="/select" element={<ParticipantSelectPage />} />
             <Route path="/settle" element={<SettlementPage />} />
+            <Route path="/settlement" element={<SettlementPage />} />
           </Routes>
         </main>
       </div>
