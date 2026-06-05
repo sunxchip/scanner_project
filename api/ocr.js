@@ -105,11 +105,20 @@ export default async function handler(req, res) {
 
       const response = await fetch(API_URL, {
         method: 'POST',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        },
         body: ocrFormData,
       });
 
       if (!response.ok) {
-        return res.status(502).json({ success: false, message: `OCR.space API 통신에 실패했습니다. (상태코드: ${response.status})` });
+        const errorText = await response.text();
+        console.error(`OCR.space API error (status: ${response.status}):`, errorText);
+        return res.status(502).json({ 
+          success: false, 
+          message: `OCR.space API 통신에 실패했습니다. (상태코드: ${response.status})`,
+          detail: errorText 
+        });
       }
 
       const data = await response.json();
