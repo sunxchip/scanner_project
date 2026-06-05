@@ -227,34 +227,43 @@ export default function ReceiptInputPage() {
     </>
   );
 
-  const renderStep4 = () => (
-    <>
-      <div style={{textAlign:'center', marginTop:'2rem'}}>
-        <h2 style={{fontSize:'1.8rem'}}>🎉<br/>링크 생성 완료!</h2>
-        <p className="text-muted mb-1">참석자들에게 아래 링크를 보내주세요.</p>
-      </div>
+  const renderStep4 = () => {
+    const receiptTotal = items.reduce((sum, item) => sum + (Number(item.price || 0) * Number(item.quantity || 1)), 0);
 
-      <div className="card" style={{marginTop:'2rem', wordBreak:'break-all', fontSize:'0.9rem', color:'var(--color-primary-dark)'}}>
-        {shareLink}
-      </div>
+    return (
+      <>
+        <div style={{textAlign:'center', marginTop:'2rem'}}>
+          <h2 style={{fontSize:'1.8rem'}}>🎉<br/>링크 생성 완료!</h2>
+          <p className="text-muted mb-1">참석자들에게 아래 링크를 보내주세요.</p>
+        </div>
 
-      <button className="btn btn-primary mb-1" onClick={copyToClipboard}>
-        💳 링크 복사하기
-      </button>
+        <div className="card text-center" style={{padding:'1.5rem', background:'var(--color-primary-light)', color:'var(--color-primary-dark)', border:'none', marginTop:'1.5rem'}}>
+          <p style={{margin:0, opacity:0.8, fontSize:'0.85rem', marginBottom:'0.25rem'}}>총 결제 금액</p>
+          <div style={{fontSize:'1.8rem', fontWeight:'900'}}>{receiptTotal.toLocaleString()}원</div>
+        </div>
 
-      {navigator.share && (
-        <button className="btn btn-secondary" onClick={() => navigator.share({title:'정산', url: shareLink})}>
-          카카오톡 / 시스템 포맷으로 공유
+        <div className="card" style={{marginTop:'1.5rem', wordBreak:'break-all', fontSize:'0.9rem', color:'var(--color-primary-dark)'}}>
+          {shareLink}
+        </div>
+
+        <button className="btn btn-primary mb-1" onClick={copyToClipboard}>
+          💳 링크 복사하기
         </button>
-      )}
 
-      <div className="bottom-cta">
-         <button className="btn btn-outline" style={{width:'100%'}} onClick={() => navigate('/')}>
-          초기화 후 홈으로
-        </button>
-      </div>
-    </>
-  );
+        {navigator.share && (
+          <button className="btn btn-secondary" onClick={() => navigator.share({title:'정산', url: shareLink})}>
+            카카오톡 / 시스템 포맷으로 공유
+          </button>
+        )}
+
+        <div className="bottom-cta">
+           <button className="btn btn-outline" style={{width:'100%'}} onClick={() => navigate('/')}>
+            초기화 후 홈으로
+          </button>
+        </div>
+      </>
+    );
+  };
 
   return (
     <div>

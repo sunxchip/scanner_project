@@ -54,6 +54,60 @@ export default function SettlementPage() {
     }
   };
 
+  const getShareText = () => {
+    if (!result) return '';
+    const totalAmount = Object.values(result).reduce((acc, user) => acc + user.finalTotal, 0);
+    let text = `[N빵 정산 결과 💸]\n\n`;
+    text += `💰 총 정산 금액: ${totalAmount.toLocaleString()}원\n`;
+    text += `------------------------\n`;
+    Object.values(result).forEach(user => {
+      text += `👤 ${user.name}: ${user.finalTotal.toLocaleString()}원\n`;
+      if (user.finalTotal > 0 && user.items && user.items.length > 0) {
+        const itemDetails = user.items.map(it => `${it.name}(${Math.round(it.cost).toLocaleString()}원)`).join(', ');
+        text += `   ↳ 상세: ${itemDetails}\n`;
+      }
+      text += `\n`;
+    });
+    text += `------------------------\n`;
+    text += `공동 비용을 입금해 주세요!`;
+    return text;
+  };
+
+  const handleCopyResult = () => {
+    const shareText = getShareText();
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(shareText).then(() => {
+        alert('정산 결과가 클립보드에 복사되었습니다! 카카오톡방에 붙여넣어 공유해 보세요.');
+      });
+    } else {
+      const textArea = document.createElement("textarea");
+      textArea.value = shareText;
+      textArea.style.position = "absolute";
+      textArea.style.left = "-999999px";
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        alert('정산 결과가 클립보드에 복사되었습니다!');
+      } catch (err) {
+        alert('복사에 실패했습니다. 직접 복사해주세요.');
+      }
+      document.body.removeChild(textArea);
+    }
+  };
+
+  const handleShareResult = () => {
+    const shareText = getShareText();
+    if (navigator.share) {
+      navigator.share({
+        title: 'N빵 정산 결과',
+        text: shareText
+      }).catch(console.error);
+    } else {
+      handleCopyResult();
+    }
+  };
+
   if (result) {
     const totalAmount = Object.values(result).reduce((acc, user) => acc + user.finalTotal, 0);
 
@@ -91,6 +145,16 @@ export default function SettlementPage() {
             )}
           </div>
         ))}
+
+        <h3 style={{marginTop:'2.5rem', marginBottom:'1rem'}}>📢 공유용 정산 메시지</h3>
+        <div className="card" style={{background:'#F8FAFC', padding:'1rem', textAlign:'left', whiteSpace:'pre-wrap', fontFamily:'monospace', fontSize:'0.85rem', color:'var(--color-text)', border:'1px solid var(--color-border)', lineHeight:'1.5', maxHeight:'200px', overflowY:'auto', marginBottom:'1rem'}}>
+          {getShareText()}
+        </div>
+
+        <div style={{display:'flex', gap:'0.5rem', marginBottom:'2rem'}}>
+          <button className="btn btn-primary" style={{flex:1, minHeight:'48px'}} onClick={handleCopyResult}>📋 결과 복사하기</button>
+          <button className="btn btn-secondary" style={{flex:1, minHeight:'48px'}} onClick={handleShareResult}>💬 카톡 공유하기</button>
+        </div>
         
         <div className="bottom-cta">
           <button className="btn btn-outline" onClick={() => setResult(null)}>다시 설정하기</button>

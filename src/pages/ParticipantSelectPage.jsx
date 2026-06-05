@@ -72,32 +72,80 @@ export default function ParticipantSelectPage() {
     }
   };
 
-  if (resultCode) {
-    return (
-      <div style={{textAlign:'center', marginTop:'2rem'}}>
-        <h2 style={{fontSize:'1.8rem'}}>🎉<br/>응답 완료!</h2>
-        <p className="text-muted mb-1">결제자에게 이 링크를 복사해서 보내주세요.<br/>(결제자가 링크를 누르면 자동으로 정산에 합산됩니다)</p>
-        
-        <div className="card" style={{wordBreak:'break-all', fontSize:'0.85rem', color:'var(--color-primary-dark)', margin:'2rem 0'}}>
-          {resultCode}
-        </div>
-
-        <button className="btn btn-primary mb-1" onClick={copyToClipboard}>결과 링크 복사하기</button>
-        {navigator.share && (
-          <button className="btn btn-secondary" onClick={() => navigator.share({title:'내 정산 결과', url: resultCode})}>
-            카카오톡 공유하기
-          </button>
-        )}
-      </div>
-    );
-  }
-
   const estimatedTotal = Object.keys(selections).reduce((sum, itemId) => {
     const item = receiptData?.items?.find(i => i.id === itemId);
     if (!item) return sum;
     const ratio = selections[itemId] || 0;
     return sum + (item.price * item.quantity * ratio);
   }, 0);
+
+  const selectedItemsSummary = Object.keys(selections)
+    .filter(itemId => selections[itemId] > 0)
+    .map(itemId => {
+      const item = receiptData?.items?.find(i => i.id === itemId);
+      if (!item) return null;
+      const ratio = selections[itemId];
+      const ratioText = ratio === 0.5 ? '절반' : '전부';
+      const cost = item.price * item.quantity * ratio;
+      return {
+        name: item.name,
+        ratioText,
+        cost
+      };
+    })
+    .filter(Boolean);
+
+  if (resultCode) {
+    const participantName = receiptData.participants.find(p => p.id === selectedProfileId)?.name || '참여자';
+    
+    const shareMessage = `[N빵 계산기] 👤 ${participantName}님의 정산 응답 결과\n💵 예상 선택 합계: ${estimatedTotal.toLocaleString()}원\n\n결제자분은 아래 링크를 클릭해 정산 결과를 합산해주세요!`;
+
+    const handleShare = () => {
+      if (navigator.share) {
+        navigator.share({
+          title: '내 N빵 선택 결과',
+          text: shareMessage,
+          url: resultCode
+        }).catch(console.error);
+      } else {
+        copyToClipboard();
+      }
+    };
+
+    return (
+      <div style={{textAlign:'center', marginTop:'2rem'}}>
+        <h2 style={{fontSize:'1.8rem'}}>🎉<br/>응답 완료!</h2>
+        <p className="text-muted mb-1">아래 선택 결과를 확인하고 결제자에게 공유해 주세요.</p>
+        
+        <div className="card" style={{textAlign:'left', margin:'1.5rem 0', padding:'1.25rem'}}>
+          <h3 style={{fontSize:'1.1rem', marginBottom:'0.75rem', borderBottom:'1px solid var(--color-border)', paddingBottom:'0.5rem'}}>
+            👤 {participantName}님의 선택 요약
+          </h3>
+          <ul style={{paddingLeft:'1.2rem', fontSize:'0.9rem', color:'var(--color-muted)', marginBottom:'1rem', listStyleType:'disc'}}>
+            {selectedItemsSummary.map((item, idx) => (
+              <li key={idx} style={{marginBottom:'0.4rem'}}>
+                <span style={{color:'var(--color-text)', fontWeight:600}}>{item.name}</span> ({item.ratioText}) : {item.cost.toLocaleString()}원
+              </li>
+            ))}
+          </ul>
+          <div style={{borderTop:'1px solid var(--color-border)', paddingTop:'0.75rem', display:'flex', justifyContent:'space-between', fontWeight:'900', fontSize:'1.1rem'}}>
+            <span>예상 정산 합계:</span>
+            <span style={{color:'var(--color-primary)'}}>{estimatedTotal.toLocaleString()}원</span>
+          </div>
+        </div>
+
+        <div className="card" style={{wordBreak:'break-all', fontSize:'0.85rem', color:'var(--color-muted)', marginBottom:'2rem', background:'#f8fafc', padding:'1rem', textAlign:'left'}}>
+          <strong>결과 취합용 링크:</strong><br/>
+          <span style={{color:'var(--color-primary-dark)'}}>{resultCode}</span>
+        </div>
+
+        <button className="btn btn-primary mb-1" onClick={copyToClipboard}>결과 링크 복사하기</button>
+        <button className="btn btn-secondary" onClick={handleShare}>
+          카카오톡 / 다른 앱으로 공유하기
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div>
