@@ -26,7 +26,8 @@ export const calculateSettlement = (receiptData, allSelections) => {
     // 비율에 맞게 분배 금액 계산
     if (totalRatio > 0) {
       itemSelections.forEach(is => {
-        const costToPay = item.price * (is.ratio / totalRatio);
+        const itemTotalCost = item.price * (item.quantity || 1);
+        const costToPay = itemTotalCost * (is.ratio / totalRatio);
         if (result[is.participantId]) {
           result[is.participantId].total += costToPay;
           result[is.participantId].items.push({
