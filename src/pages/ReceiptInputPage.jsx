@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { parseReceiptText } from '../utils/receiptParser';
+import { parseReceiptText, parseGrandTotal } from '../utils/receiptParser';
 import { encodeData } from '../utils/encoding';
 import { recognizeReceiptImage } from '../services/ocrClient';
 import { useNavigate } from 'react-router-dom';
@@ -41,6 +41,7 @@ export default function ReceiptInputPage() {
       
       setText(result.rawText);
       const parsed = parseReceiptText(result.rawText);
+      const detectedGrandTotal = parseGrandTotal(result.rawText);
       
       if (parsed.length === 0) {
         setIsRawTextOpen(true);
@@ -48,6 +49,13 @@ export default function ReceiptInputPage() {
         alert('메뉴를 완벽히 찾지 못했습니다. 텍스트를 수정하거나 직접 입력해주세요.');
       } else {
         setItems(parsed);
+        // 무결성 검증 추가
+        if (detectedGrandTotal !== null) {
+          const itemsSum = parsed.reduce((sum, item) => sum + (Number(item.price || 0) * Number(item.quantity || 1)), 0);
+          if (itemsSum !== detectedGrandTotal) {
+            alert(`⚠️ 영수증 총액 불일치 감지!\n\n영수증 전체 합계(${detectedGrandTotal.toLocaleString()}원)와 개별 메뉴의 총액 합계(${itemsSum.toLocaleString()}원)가 일치하지 않습니다. 다음 단계에서 가격 또는 수량을 꼭 확인해 주세요!`);
+          }
+        }
       }
       setStep(2);
     } catch (err) {

@@ -88,6 +88,32 @@ export const parseReceiptText = (text) => {
         }
       }
 
+      // nameTokens에서 단가 후보 찾기
+      let unitPriceCandidate = -1;
+      for (let i = 0; i < nameTokens.length; i++) {
+        let cleanToken = nameTokens[i].replace(/,/g, '');
+        if (/^\d+$/.test(cleanToken)) {
+          let num = parseInt(cleanToken, 10);
+          // 단가는 총액(priceCandidate)보다 작고 500원 이상이어야 함
+          if (num >= 500 && num < priceCandidate) {
+            unitPriceCandidate = num;
+            nameTokens.splice(i, 1); // 이름에서 단가 토큰 제거
+            break;
+          }
+        }
+      }
+
+      let finalUnitPrice = priceCandidate;
+      if (quantity > 1) {
+        // 단가 * 수량 === 총액이 맞는지 검증
+        if (unitPriceCandidate !== -1 && unitPriceCandidate * quantity === priceCandidate) {
+          finalUnitPrice = unitPriceCandidate;
+        } else {
+          // 정보가 누락되었거나 계산이 맞지 않는 경우 금액을 우선시하여 단가 역산
+          finalUnitPrice = Math.round(priceCandidate / quantity);
+        }
+      }
+
       let name = cleanName(nameTokens.join(' '));
 
       // 이름이 비어있거나 너무 짧으면, 아까 기억해둔 윗줄(pendingName)을 사용
@@ -99,7 +125,7 @@ export const parseReceiptText = (text) => {
           items.push({
             id: `item_${idCounter++}`,
             name,
-            price: priceCandidate,
+            price: finalUnitPrice,
             quantity
           });
         }
@@ -109,7 +135,7 @@ export const parseReceiptText = (text) => {
         items.push({
           id: `item_${idCounter++}`,
           name,
-          price: priceCandidate,
+          price: finalUnitPrice,
           quantity
         });
       }
@@ -134,4 +160,25 @@ export const parseReceiptText = (text) => {
   }
   
   return items;
+};
+
+// 영수증 텍스트 전체에서 최종 합계 금액(Grand Total) 키워드를 매칭하여 파싱하는 보조 함수
+export const parseGrandTotal = (text) => {
+  if (!text) return null;
+  const lines = text.split('\n');
+  for (let line of lines) {
+    // 공백 및 콤마 제거
+    let trimmed = line.replace(/\s+/g, '').replace(/,/g, '');
+    if (/(합계|결제금액|총금액|총액|받을금액|합계금액|승인금액)/.test(trimmed)) {
+      const match = trimmed.match(/\d+/g);
+      if (match) {
+        // 가장 크거나 마지막에 나타나는 숫자를 금액으로 추출
+        const num = parseInt(match[match.length - 1], 10);
+        if (num >= 1000 && num <= 1000000) {
+          return num;
+        }
+      }
+    }
+  }
+  return null;
 };
