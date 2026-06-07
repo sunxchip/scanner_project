@@ -3,6 +3,38 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { decodeData } from '../utils/encoding';
 import { calculateSettlement } from '../utils/calculator';
 
+// 응답 코드 리스트에서 동일 참여자(participantId)의 기존 코드를 새 코드로 덮어쓰거나 중복 없이 추가하는 헬퍼 함수
+const addOrUpdateResponseCode = (existingCodesString, newCode) => {
+  if (!newCode) return existingCodesString;
+  
+  const newDecoded = decodeData(newCode);
+  if (!newDecoded || !newDecoded.participantId) {
+    const lines = existingCodesString.split('\n').map(l => l.trim()).filter(Boolean);
+    if (!lines.includes(newCode)) {
+      lines.push(newCode);
+    }
+    return lines.join('\n');
+  }
+
+  const newPid = newDecoded.participantId;
+  const lines = existingCodesString.split('\n').map(l => l.trim()).filter(Boolean);
+  const codeMap = {};
+  const invalidCodes = [];
+
+  lines.forEach(line => {
+    const decoded = decodeData(line);
+    if (decoded && decoded.participantId) {
+      codeMap[decoded.participantId] = line;
+    } else {
+      invalidCodes.push(line);
+    }
+  });
+
+  codeMap[newPid] = newCode;
+  const updatedCodes = [...Object.values(codeMap), ...invalidCodes];
+  return updatedCodes.join('\n');
+};
+
 export default function SettlementPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -19,7 +51,7 @@ export default function SettlementPage() {
 
     const addResponse = searchParams.get('addResponse');
     if (addResponse) {
-      const newCodes = savedParticipants ? `${savedParticipants}\n${addResponse}` : addResponse;
+      const newCodes = addOrUpdateResponseCode(savedParticipants, addResponse);
       setParticipantCodes(newCodes);
       localStorage.setItem('participantCodes', newCodes);
       // Remove query param to clean URL
@@ -46,8 +78,17 @@ export default function SettlementPage() {
 
     const allSelections = lines.map(line => decodeData(line)).filter(Boolean);
 
+    // 참여자(participantId) 기준 중복 제거 (동일 참여자의 경우 최신 선택 코드 하나만 인정)
+    const uniqueSelectionsMap = {};
+    allSelections.forEach(sel => {
+      if (sel && sel.participantId) {
+        uniqueSelectionsMap[sel.participantId] = sel;
+      }
+    });
+    const uniqueSelections = Object.values(uniqueSelectionsMap);
+
     try {
-      const settlementResult = calculateSettlement(decodedReceipt, allSelections);
+      const settlementResult = calculateSettlement(decodedReceipt, uniqueSelections);
       setResult(settlementResult);
     } catch (e) {
       alert('정산 중 오류가 발생했습니다. 코드 형태를 확인해주세요.');
