@@ -160,7 +160,20 @@ export const validateAndCalculate = (items, selections, participants, roundingUn
     }
   });
 
-  // 수량이 일치하지 않으면 정산 진행하지 않음
+  // 모든 참여자가 '정산 완료' 상태(isCompleted)를 눌렀는지 실시간 체크
+  const incompleteParticipants = Object.values(participants)
+    .filter(p => !p.isCompleted)
+    .map(p => p.name);
+
+  if (incompleteParticipants.length > 0) {
+    isReadyToSettlement = false;
+    validationErrors.push({
+      status: "INCOMPLETE_USERS",
+      message: `아직 정산을 완료하지 않은 참여자가 있습니다: ${incompleteParticipants.join(", ")}`
+    });
+  }
+
+  // 준비되지 않은 경우 결과 없음으로 리턴
   if (!isReadyToSettlement) {
     return {
       isReadyToSettlement,
