@@ -75,8 +75,8 @@ export default function ParticipantSelectPage() {
   const estimatedTotal = Object.keys(selections).reduce((sum, itemId) => {
     const item = receiptData?.items?.find(i => i.id === itemId);
     if (!item) return sum;
-    const ratio = selections[itemId] || 0;
-    return sum + (item.price * item.quantity * ratio);
+    const selectionVal = selections[itemId] || 0;
+    return sum + (item.price * selectionVal);
   }, 0);
 
   const selectedItemsSummary = Object.keys(selections)
@@ -84,9 +84,10 @@ export default function ParticipantSelectPage() {
     .map(itemId => {
       const item = receiptData?.items?.find(i => i.id === itemId);
       if (!item) return null;
-      const ratio = selections[itemId];
-      const ratioText = ratio === 0.5 ? '절반' : '전부';
-      const cost = item.price * item.quantity * ratio;
+      const selectionVal = selections[itemId];
+      const qty = item.ocrQuantity || item.quantity || 1;
+      const ratioText = qty >= 2 ? `${selectionVal}개` : (selectionVal === 0.5 ? '절반' : '전부');
+      const cost = item.price * selectionVal;
       return {
         name: item.name,
         ratioText,
@@ -168,27 +169,63 @@ export default function ParticipantSelectPage() {
       {selectedProfileId ? (
         <>
           <h3 style={{marginTop:'2rem'}}>메뉴 체크리스트</h3>
-          {receiptData.items.map(item => (
-            <div key={item.id} className="card" style={{padding:'1.25rem', marginBottom:'1rem'}}>
-              <div style={{fontWeight:'700', fontSize:'1.1rem', marginBottom:'0.25rem'}}>{item.name}</div>
-              <div className="text-muted" style={{marginBottom:'1rem'}}>{item.price.toLocaleString()}원</div>
-              
-              <div className="segmented-control">
-                <div 
-                  className={`segmented-btn ${selections[item.id] === 0 || selections[item.id] === undefined ? 'active' : ''}`}
-                  onClick={() => handleRatioChange(item.id, 0)}
-                >안 먹음</div>
-                <div 
-                  className={`segmented-btn ${selections[item.id] === 0.5 ? 'active' : ''}`}
-                  onClick={() => handleRatioChange(item.id, 0.5)}
-                >절반</div>
-                <div 
-                  className={`segmented-btn ${selections[item.id] === 1 ? 'active' : ''}`}
-                  onClick={() => handleRatioChange(item.id, 1)}
-                >전부</div>
+          {receiptData.items.map(item => {
+            const ocrQty = Number(item.ocrQuantity || item.quantity || 1);
+            return (
+              <div key={item.id} className="card" style={{padding:'1.25rem', marginBottom:'1rem'}}>
+                <div style={{fontWeight:'700', fontSize:'1.1rem', marginBottom:'0.25rem'}}>{item.name}</div>
+                <div className="text-muted" style={{marginBottom:'1rem'}}>{item.price.toLocaleString()}원</div>
+                
+                {ocrQty >= 2 ? (
+                  // 수량이 2개 이상일 때: 수량 선택 컨트롤 (- 숫자 +) UI
+                  <div style={{display:'flex', alignItems:'center', gap:'1rem', marginTop:'0.5rem'}}>
+                    <button 
+                      className="btn" 
+                      style={{width:'40px', height:'40px', padding:0, fontSize:'1.2rem', fontWeight:'900', border:'1px solid var(--color-border)', background:'white'}}
+                      onClick={() => {
+                        const currentVal = selections[item.id] || 0;
+                        handleRatioChange(item.id, Math.max(0, currentVal - 1));
+                      }}
+                    >-</button>
+                    <span style={{fontSize:'1.2rem', fontWeight:'700', minWidth:'40px', textAlign:'center'}}>
+                      {selections[item.id] || 0}개
+                    </span>
+                    <button 
+                      className="btn" 
+                      style={{width:'40px', height:'40px', padding:0, fontSize:'1.2rem', fontWeight:'900', border:'1px solid var(--color-border)', background:'white'}}
+                      onClick={() => {
+                        const currentVal = selections[item.id] || 0;
+                        if (currentVal < ocrQty) {
+                          handleRatioChange(item.id, currentVal + 1);
+                        } else {
+                          alert(`주문된 총 수량(${ocrQty}개)을 초과할 수 없습니다.`);
+                        }
+                      }}
+                    >+</button>
+                    <span style={{fontSize:'0.85rem', color:'var(--color-muted)', marginLeft:'auto'}}>
+                      (총 수량: {ocrQty}개)
+                    </span>
+                  </div>
+                ) : (
+                  // 수량이 1개일 때: 기존 [안 먹음 / 절반 / 전부] 버튼 UI
+                  <div className="segmented-control">
+                    <div 
+                      className={`segmented-btn ${selections[item.id] === 0 || selections[item.id] === undefined ? 'active' : ''}`}
+                      onClick={() => handleRatioChange(item.id, 0)}
+                    >안 먹음</div>
+                    <div 
+                      className={`segmented-btn ${selections[item.id] === 0.5 ? 'active' : ''}`}
+                      onClick={() => handleRatioChange(item.id, 0.5)}
+                    >절반</div>
+                    <div 
+                      className={`segmented-btn ${selections[item.id] === 1 ? 'active' : ''}`}
+                      onClick={() => handleRatioChange(item.id, 1)}
+                    >전부</div>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
           
           <div className="bottom-cta" style={{display:'flex', flexDirection:'column', gap:'0.5rem'}}>
             <div style={{textAlign:'center', padding:'0.5rem', background:'var(--color-primary-light)', borderRadius:'8px', color:'var(--color-primary-dark)', fontWeight:700}}>
