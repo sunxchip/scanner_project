@@ -1,11 +1,12 @@
 // 핵심 정산 로직: SSOT, 어떤 상태도 직접 변경하지 않는 순수 함수 형태
 export const calculateSettlement = (receiptData, allSelections) => {
   // allSelections = [{ participantId: 'p1', completedAt: 1717721500000, selections: [{itemId: 'item_1', ratio: 1}, ...] }]
+  // 또는 실시간 DB 구조인 경우 객체 매핑 형태: { p1: { item_1: 1, item_2: 0.5 } }
   const { items, participants, options = { roundingUnit: 10 } } = receiptData;
   const unit = options.roundingUnit || 10;
   const result = {};
 
-  // 1. 초기화
+  // 1. 결과 데이터 구조 초기화
   participants.forEach(p => {
     result[p.id] = { 
       name: p.name, 
@@ -16,47 +17,73 @@ export const calculateSettlement = (receiptData, allSelections) => {
     };
   });
 
-  // 영수증 총합 구하기
-  const grandTotal = items.reduce((sum, item) => sum + (Number(item.price || 0) * Number(item.quantity || 1)), 0);
+  // 2. selections 데이터 표준화 (참여자 ID -> { 메뉴 ID -> 수량/비율 })
+  const normalizedSelections = {};
+  const completedAtMap = {};
 
-  // 2. 메뉴별 분배
-  items.forEach(item => {
-    let totalRatio = 0;
-    const itemSelections = [];
-
-    // 메뉴를 먹은 사람들 찾기
+  if (Array.isArray(allSelections)) {
     allSelections.forEach(sd => {
-      const sel = sd.selections.find(s => s.itemId === item.id);
-      if (sel && sel.ratio > 0) {
-        totalRatio += sel.ratio;
-        itemSelections.push({ participantId: sd.participantId, ratio: sel.ratio });
+      normalizedSelections[sd.participantId] = {};
+      completedAtMap[sd.participantId] = sd.completedAt || 0;
+      if (Array.isArray(sd.selections)) {
+        sd.selections.forEach(sel => {
+          normalizedSelections[sd.participantId][sel.itemId] = Number(sel.ratio || sel.selectedQuantity || 0);
+        });
       }
     });
+  } else if (typeof allSelections === 'object' && allSelections !== null) {
+    Object.entries(allSelections).forEach(([pId, pSelection]) => {
+      normalizedSelections[pId] = {};
+      if (typeof pSelection === 'object' && pSelection !== null) {
+        Object.entries(pSelection).forEach(([itemId, val]) => {
+          normalizedSelections[pId][itemId] = Number(val || 0);
+        });
+      }
+    });
+  }
 
-    // 비율에 맞게 분배 금액 계산
-    if (totalRatio > 0) {
-      itemSelections.forEach(is => {
-        const itemTotalCost = item.price * (item.quantity || 1);
-        const costToPay = itemTotalCost * (is.ratio / totalRatio);
-        if (result[is.participantId]) {
-          result[is.participantId].total += costToPay;
-          result[is.participantId].items.push({
-            name: item.name,
-            cost: costToPay
-          });
-        }
-      });
-    }
+  // 영수증 총합 구하기
+  // ocrQuantity가 있으면 price는 총액, 없으면 price * quantity가 총액
+  const grandTotal = items.reduce((sum, item) => {
+    const ocrQty = Number(item.ocrQuantity || item.quantity || 1);
+    const hasOcrQty = typeof item.ocrQuantity !== 'undefined';
+    const totalLinePrice = Number(item.price || 0) * (hasOcrQty ? 1 : ocrQty);
+    return sum + totalLinePrice;
+  }, 0);
+
+  // 3. 메뉴별 분배
+  items.forEach(item => {
+    const ocrQty = Number(item.ocrQuantity || item.quantity || 1);
+    const hasOcrQty = typeof item.ocrQuantity !== 'undefined';
+    const totalLinePrice = Number(item.price || 0) * (hasOcrQty ? 1 : ocrQty);
+    
+    // 1개당 단가 계산
+    const unitPrice = totalLinePrice / ocrQty;
+
+    // 각 참가자의 수량에 맞춰 분배
+    Object.entries(normalizedSelections).forEach(([pId, pSelection]) => {
+      const selectedQuantity = Number(pSelection[item.id] || 0);
+      if (selectedQuantity > 0 && result[pId]) {
+        const costToPay = unitPrice * selectedQuantity;
+        result[pId].total += costToPay;
+        result[pId].items.push({
+          name: item.name,
+          cost: costToPay,
+          unitPrice: unitPrice,
+          selectedQuantity: selectedQuantity
+        });
+      }
+    });
   });
 
-  // 3. 1차 반올림 처리
+  // 4. 1차 반올림 처리
   let roundedSum = 0;
   Object.values(result).forEach(userResult => {
     userResult.finalTotal = Math.round(userResult.total / unit) * unit;
     roundedSum += userResult.finalTotal;
   });
 
-  // 4. 오차(낙전) 산출 및 마지막 체크 완료 유저에게 귀속
+  // 5. 오차(낙전) 산출 및 마지막 체크 완료 유저에게 귀속
   const difference = grandTotal - roundedSum;
 
   let lastParticipantId = null;
@@ -64,8 +91,7 @@ export const calculateSettlement = (receiptData, allSelections) => {
 
   participants.forEach(p => {
     // allSelections에 누적된 completedAt 또는 participant 객체 자체의 completedAt 사용
-    const selectionInfo = allSelections.find(sel => sel.participantId === p.id);
-    const completedAt = (selectionInfo && selectionInfo.completedAt) || p.completedAt || 0;
+    const completedAt = completedAtMap[p.id] || p.completedAt || 0;
 
     if (completedAt > maxTimestamp) {
       maxTimestamp = completedAt;
